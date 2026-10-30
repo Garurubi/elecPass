@@ -1,6 +1,8 @@
 export function grade(question, response) {
   if (!question.answer || question.type === 'short') return null;
-  return question.answer.trim().startsWith(response) && response !== '';
+  const answer = question.answer.trim().replaceAll('Ο', 'O');
+  const selected = response.trim().replaceAll('Ο', 'O');
+  return selected !== '' && answer.startsWith(selected);
 }
 export function shuffle(items, random = Math.random) {
   const result = [...items];

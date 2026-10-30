@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Dexie, { type Table } from 'dexie';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Download, History, Lightbulb, Play, RotateCcw, Shuffle, Star, Target, TrendingUp, Upload, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Download, History, Lightbulb, PencilLine, Play, RotateCcw, Shuffle, Star, Target, TrendingUp, Upload, Zap } from 'lucide-react';
 import data from './questions.json';
 import { accuracy, grade, shuffle } from './logic.mjs';
 import './style.css';
@@ -46,6 +46,7 @@ function App() {
   const pool=data.questions.filter(q=>{
     if (setup === '즐겨찾기') return saved.favorites.includes(q.id);
     if (setup === '오답 복습') return wrongIds.includes(q.id) && (book === 'all' || q.bookId === book);
+    if (setup === '단답형 집중') return q.type === 'short' && (book === 'all' || q.bookId === book);
     return book === 'all' || q.bookId === book;
   });
   function begin() {
@@ -90,7 +91,7 @@ function App() {
   <section className="overview"><div><span className="pill">과정평가형 · 전기설비</span><h2>개념은 확실하게,<br className="mobile-break"/> 복습은 꾸준하게.</h2><p>{data.books.length}개 문제집 <span>·</span> {data.questions.length}문항 <span>·</span> 정답 {data.questions.filter(q=>q.answer).length} / 해설 {data.questions.filter(q=>q.explanation).length}문항</p></div><div className="overview-side"><BookOpen size={30}/><span>오늘의 작은 진전</span><strong>{saved.records.filter(r=>new Date(r.time).toDateString()===new Date().toDateString()).length}<small> 문제 학습</small></strong></div></section>
   {s&&!s.finished&&<button className="resume" onClick={()=>setPage('quiz')}><Play size={18}/><span>이어서 풀기 <small>{s.title} · {s.index+1}/{s.ids.length}</small></span><ArrowRight size={19}/></button>}
   <div className="section-title"><h3>문제 풀기</h3><span>나에게 맞는 방식으로</span></div><div className="menu-grid">
-  {[{name:'랜덤 문제',desc:'문제 수를 정해 새로운 조합으로 학습',icon:Shuffle,tone:'blue'},{name:'문제집별 풀이',desc:'문제집을 선택해 처음부터 차근차근',icon:BookOpen,tone:'purple'},{name:'오답 복습',desc:'틀렸던 문제를 다시 풀며 빈틈 채우기',icon:RotateCcw,tone:'orange'},{name:'즐겨찾기',desc:'별표한 문제만 모아서 집중 학습',icon:Star,tone:'yellow'}].map(item=><button className="menu-card" key={item.name} onClick={()=>openSetup(item.name)}><span className={`tile-icon ${item.tone}`}><item.icon size={23}/></span><div><h2>{item.name}</h2><p>{item.desc}</p></div><ChevronRight className="card-arrow" size={19}/></button>)}</div>
+  {[{name:'랜덤 문제',desc:'문제 수를 정해 새로운 조합으로 학습',icon:Shuffle,tone:'blue'},{name:'문제집별 풀이',desc:'문제집을 선택해 처음부터 차근차근',icon:BookOpen,tone:'purple'},{name:'오답 복습',desc:'틀렸던 문제를 다시 풀며 빈틈 채우기',icon:RotateCcw,tone:'orange'},{name:'즐겨찾기',desc:'별표한 문제만 모아서 집중 학습',icon:Star,tone:'yellow'},{name:'단답형 집중',desc:'단답형 문제만 모아 직접 답을 작성하며 학습',icon:PencilLine,tone:'green'}].map(item=><button className={`menu-card ${item.name==='단답형 집중'?'short-focus':''}`} key={item.name} onClick={()=>openSetup(item.name)}><span className={`tile-icon ${item.tone}`}><item.icon size={23}/></span><div><h2>{item.name}</h2><p>{item.desc}</p></div><ChevronRight className="card-arrow" size={19}/></button>)}</div>
   <div className="section-title"><h3>나의 학습</h3><button onClick={()=>setPage('stats')}>전체 기록 <ArrowRight size={14}/></button></div><section className="metrics">{[['오답',wrongIds.length],['즐겨찾기',saved.favorites.filter(id=>qmap.has(id)).length],['누적 풀이',saved.records.length],['정답률',rate===null?'—':`${rate}%`]].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
   <section className="library"><div className="section-title"><h3>내 문제집</h3><span>PDF에서 가져온 학습 자료</span></div>{data.books.map(b=><button className="book-row" key={b.id} onClick={()=>{openSetup('문제집별 풀이');setBook(b.id);}}><span className="book-icon"><BookOpen size={20}/></span><span><strong>{b.title}</strong><small>{b.note} · {b.count}문항</small></span><span className={`status ${b.hasAnswers?'available':''}`}>{b.hasAnswers?'학습 준비 완료':'문제만 수록'}</span><ChevronRight size={17}/></button>)}</section></>}
   {page==='quiz'&&s&&q&&<><div className="quiz-heading"><button className="back" onClick={()=>setPage('home')}><ArrowLeft size={17}/> 나가기</button><span>{s.mode==='study'?'해설 모드':'실전 모드'}</span></div><h1 className="quiz-title">{s.title}</h1><div className="progress-label"><span>{data.books.find(b=>b.id===q.bookId)?.title}</span><strong>{s.index+1} <span>/ {s.ids.length}</span></strong></div><progress value={s.index+1} max={s.ids.length}/><div className="question-meta"><span>{labels[q.type as keyof typeof labels]}</span><span>{q.topic}</span></div>

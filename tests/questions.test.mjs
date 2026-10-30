@@ -36,12 +36,15 @@ test('combined PDFs retain stable IDs, topics and metadata without answer leakag
 });
 test('grading excludes missing keys and subjective responses, not unanswered objective questions',()=>{
  assert.equal(grade({type:'ox',answer:'O (참)'},'O'),true);
+ assert.equal(grade({type:'ox',answer:'Ο (참)'},'O'),true);
+ assert.equal(grade({type:'ox',answer:'O (참)'},'Ο'),true);
  assert.equal(grade({type:'choice',answer:'②'},'①'),false);
  assert.equal(grade({type:'choice',answer:'②'},''),false);
  assert.equal(grade({type:'short',answer:'검상기'},'검상기'),null);
  assert.equal(grade({type:'ox',answer:null},'O'),null);
  assert.equal(accuracy([{correct:true},{correct:false},{correct:null}]),50);
  assert.equal(accuracy([{correct:null}]),null);
+ assert.ok(questions.every(q=>!q.answer?.includes('Ο')));
 });
 test('random practice retains unique question identities without modifying source',()=>{
  const source=[1,2,3,4];const result=shuffle(source,()=>.2);assert.deepEqual([...result].sort(),source);assert.deepEqual(source,[1,2,3,4]);assert.notEqual(result,source);
@@ -88,4 +91,10 @@ test('third motor wiring practice set is fully imported',()=>{
  assert.ok(book);
  const qs=questions.filter(q=>q.bookId===book.id);
  assert.equal(qs.length,30);assert.equal(qs.filter(q=>q.answer).length,30);assert.equal(qs.filter(q=>q.explanation).length,30);
+});
+
+test('short-answer focused practice has a complete pool',()=>{
+ const short=questions.filter(q=>q.type==='short');
+ assert.equal(short.length,55);assert.ok(short.every(q=>q.answer));
+ assert.ok(books.every(b=>short.filter(q=>q.bookId===b.id).length===5));
 });

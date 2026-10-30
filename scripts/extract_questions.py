@@ -20,6 +20,10 @@ def clean(s):
     return re.sub(r'\s+', ' ', s).strip()
 
 
+def normalize_answer(s):
+    return clean(s).replace('Ο', 'O')
+
+
 def canonical_name(name):
     name = name.replace('(답안포함)', '').replace('(답안)', '')
     return re.sub(r'\((\d+회)\s+답안포함\)', r'(\1)', name)
@@ -103,13 +107,14 @@ for file in sorted(selected.values(), key=lambda p: str(p)):
         full = '\n'.join(a_pages)
         if '제2부. 정답' in full:
             table = full.split('제2부. 정답', 1)[1].split('문항별 상세 해설', 1)[0]
-            token = r'(?:[OX]\s*\((?:참|거짓)\)|[①②③④]|부싱\s*\(Bushing\)|리듀서\s*\(Reducer\)|[ㄱ-ㅎ](?:\s*,\s*[ㄱ-ㅎ])+|방폭형 콘센트)'
+            token = r'(?:[OΟX]\s*\((?:참|거짓)\)|[①②③④]|부싱\s*\(Bushing\)|리듀서\s*\(Reducer\)|[ㄱ-ㅎ](?:\s*,\s*[ㄱ-ㅎ])+|방폭형 콘센트)'
             for m in re.finditer(r'문\s*(\d+)\s+(' + token + ')', table):
                 number = int(m[1])
-                answers[number] = clean(m[2])
+                answers[number] = normalize_answer(m[2])
                 answer_pages[number] = next((i + 1 for i, t in enumerate(a_pages) if re.search(r'문\s*' + str(number) + r'\s+' + token, t)), answer_pages.get(number))
             details = answer_details(full)
             for i, (m, n, detailed_answer, reference) in enumerate(details):
+                detailed_answer = normalize_answer(detailed_answer)
                 detail = clean(full[m.end():details[i + 1][0].start() if i + 1 < len(details) else len(full)])
                 if n in answers and re.fullmatch(r'[①②③④]|[OX]\s*\((?:참|거짓)\)', answers[n]) and answers[n] != detailed_answer:
                     conflicts[n] = f'원본 답안 불일치: 빠른 정답표 {answers[n]}, 상세 해설 {detailed_answer}. 확인 전 자동 채점에서 제외합니다.'
@@ -161,7 +166,7 @@ for file in sorted(selected.values(), key=lambda p: str(p)):
         if tag:
             raw = raw[:tag.start()] + raw[tag.end():]
         question_type = 'ox' if re.search(r'선택\s*:', raw) else 'choice' if '①' in raw else 'short'
-        raw = re.sub(r'선택\s*:\s*\(\s*O\s*/\s*X\s*\)|답(?:란|안)?\s*:\s*(?:\([^)]*\)|_+)', '', raw)
+        raw = re.sub(r'선택\s*:\s*\(\s*[OΟ]\s*/\s*X\s*\)|답(?:란|안)?\s*:\s*(?:\([^)]*\)|_+)', '', raw)
         raw = re.sub(r'\s*_+(?:\s*,?\s*\(\d+\)\s*_+)*\s*$', '', raw)
         parts = re.split(r'[①②③④]', raw) if question_type == 'choice' else [raw]
         page = next((p + 1 for p, t in enumerate(pages) if re.search(rf'문\s*{n}\.', t)), 1)
