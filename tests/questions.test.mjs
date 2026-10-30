@@ -4,10 +4,10 @@ import {readFileSync} from 'node:fs';
 import {grade,accuracy,shuffle} from '../src/logic.mjs';
 const {questions,books}=JSON.parse(readFileSync(new URL('../src/questions.json',import.meta.url),'utf8'));
 test('PDF corpus has unique, complete question sequences and intact choices',()=>{
- assert.equal(questions.length,180);assert.equal(new Set(questions.map(q=>q.id)).size,180);
+ assert.equal(questions.length,330);assert.equal(new Set(questions.map(q=>q.id)).size,330);
  for(const b of books)assert.deepEqual(questions.filter(q=>q.bookId===b.id).map(q=>q.number),Array.from({length:30},(_,i)=>i+1));
  for(const q of questions){assert.ok(q.prompt.length>10);assert.ok(q.page>0);assert.ok(!q.prompt.includes('제2부.'));if(q.type==='choice'){assert.equal(q.options.length,4);assert.ok(q.options.every(x=>x.length>0));}}
- assert.equal(questions.filter(q=>q.answer).length,180);
+ assert.equal(questions.filter(q=>q.answer).length,330);
 });
 test('answer key matches the source quick-answer table',()=>{
  const qs=questions.filter(q=>q.bookId==='book-1');
@@ -48,8 +48,8 @@ test('random practice retains unique question identities without modifying sourc
 });
 
 test('new books preserve types, handle conflicting keys, and include scanned answers',()=>{
- assert.equal(books.length,6);
- assert.equal(questions.filter(q=>q.explanation).length,155);
+ assert.equal(books.length,11);
+ assert.equal(questions.filter(q=>q.explanation).length,305);
  for(const book of books){const qs=questions.filter(q=>q.bookId===book.id);assert.equal(qs.filter(q=>q.type==='choice').length,20);assert.equal(qs.filter(q=>q.type==='short').length,5);assert.equal(qs.filter(q=>q.type==='ox').length,5);}
  const conflict=questions.find(q=>q.id==='book-2-q14');
  assert.equal(conflict.answer,'③');assert.match(conflict.answerNote,/사용자 확인으로 정답 ③/);assert.equal(grade(conflict,'③'),true);
@@ -61,4 +61,31 @@ test('new books preserve types, handle conflicting keys, and include scanned ans
  assert.ok(scan.every(q=>q.explanation&&q.reference.includes('원문 해설 요약')));
  assert.ok(questions.every(q=>!q.explanation?.includes('종합 모의고사 |')));
  const grounding=questions.find(q=>q.id==='book-4-q02');assert.ok(grounding.prompt.includes('400 [K]'));
+});
+
+test('piping, lighting and heating practice set 4 is fully imported',()=>{
+ const book=books.find(b=>b.file.startsWith('(과평)배관배선+조명+전열 예상문제4('));
+ assert.ok(book);assert.equal(book.count,30);assert.equal(book.hasAnswers,true);
+ const qs=questions.filter(q=>q.bookId===book.id);
+ assert.equal(qs.length,30);assert.equal(qs.filter(q=>q.answer).length,30);assert.equal(qs.filter(q=>q.explanation).length,30);
+ assert.deepEqual(qs.slice(0,5).map(q=>q.answer),['O (참)','X (거짓)','X (거짓)','O (참)','O (참)']);
+ assert.deepEqual(qs.slice(10).map(q=>q.answer),['①','③','②','②','①','③','①','②','①','②','②','③','②','③','②','②','②','③','②','②']);
+ assert.ok(qs.every(q=>q.sourceFile===book.file&&q.answerSourceFile===book.file));
+});
+
+test('motor wiring practice sets retain unlabelled and final explanations',()=>{
+ const first=books.find(b=>b.file.includes('종합 실전 모의고사 (1회'));
+ const firstQs=questions.filter(q=>q.bookId===first.id);
+ assert.equal(firstQs.filter(q=>q.answer).length,30);assert.equal(firstQs.filter(q=>q.explanation).length,30);
+ assert.deepEqual(firstQs.slice(5,8).map(q=>q.answer),['암타이 (Arm Tie)','D = WS² / 8T (또는 D = (W · S²) / (8 · T))','1.25배']);
+ const second=books.find(b=>b.file.includes('종합 실전 모의고사 (2회'));
+ const last=questions.find(q=>q.bookId===second.id&&q.number===30);
+ assert.ok(last.explanation.includes('정지 램프(Green)'));assert.equal(last.explanationNote,null);
+});
+
+test('third motor wiring practice set is fully imported',()=>{
+ const book=books.find(b=>b.file.includes('종합 실전 모의고사 (3회'));
+ assert.ok(book);
+ const qs=questions.filter(q=>q.bookId===book.id);
+ assert.equal(qs.length,30);assert.equal(qs.filter(q=>q.answer).length,30);assert.equal(qs.filter(q=>q.explanation).length,30);
 });
