@@ -110,13 +110,14 @@ test('basic difficulty PDFs are isolated as ten complete rounds',()=>{
   const qs=basicQuestions.filter(q=>q.bookId===set.id);
   assert.deepEqual(qs.map(q=>q.number),Array.from({length:40},(_,i)=>i+1));
   assert.equal(qs.filter(q=>q.type==='choice').length,26);
-  assert.equal(qs.filter(q=>q.type==='short'||q.type==='matching').length,14);
+  assert.equal(qs.filter(q=>q.type==='ox').length,2);
+  assert.equal(qs.filter(q=>q.type==='short'||q.type==='matching').length,12);
   assert.ok(qs.every(q=>q.answer&&q.sourceFile===set.file&&q.answerSourceFile===set.file));
   assert.ok(qs.filter(q=>q.type==='choice').every(q=>/^[①②③④]$/.test(q.answer)));
  }
  assert.ok(basicSets.every(set=>!books.some(book=>book.id===set.id||book.file===set.file)));
  assert.equal(basicQuestions.filter(q=>q.explanation).length,373);
- const matching=basicQuestions.filter(q=>q.type==='matching');assert.equal(matching.length,17);
+ const matching=basicQuestions.filter(q=>q.type==='matching');assert.equal(matching.length,18);
  assert.ok(matching.every(q=>q.leftItems.length===3&&q.rightItems.length===3&&Object.keys(q.answerMap).length===3));
  assert.ok(basicQuestions.every(q=>!/[ⅠⅡⅢⅣ]\.\s*(객관식|빈칸|계산형)|빠른 정답표|/.test([q.prompt,q.answer,q.explanation,q.reference].filter(Boolean).join(' '))));
  assert.deepEqual(basicQuestions.filter(q=>q.bookId==='basic-01').slice(4,9).map(q=>q.answer),['①','①','④','③','①']);
