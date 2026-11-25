@@ -12,6 +12,12 @@ export function grade(question, response) {
   if (!question.answer || question.type === 'short') return null;
   const answer = question.answer.trim().replaceAll('Ο', 'O');
   const selected = response.trim().replaceAll('Ο', 'O');
+  if (/^1\s*-\s*[OX]/i.test(answer)) {
+    const normalize = value => [...value.matchAll(/(\d+)\s*-\s*([OX])/gi)]
+      .map(([, number, choice]) => `${number}-${choice.toUpperCase()}`)
+      .join(', ');
+    return selected !== '' && normalize(selected) === normalize(answer);
+  }
   return selected !== '' && answer.startsWith(selected);
 }
 export function shuffle(items, random = Math.random) {

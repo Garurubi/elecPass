@@ -40,6 +40,9 @@ test('grading excludes missing keys and subjective responses, not unanswered obj
  assert.equal(grade({type:'ox',answer:'O (참)'},'O'),true);
  assert.equal(grade({type:'ox',answer:'Ο (참)'},'O'),true);
  assert.equal(grade({type:'ox',answer:'O (참)'},'Ο'),true);
+ assert.equal(grade({type:'ox',answer:'1-O, 2-X, 3-O'},'1-O, 2-X, 3-O'),true);
+ assert.equal(grade({type:'ox',answer:'1-O, 2-X, 3-O'},'1-O, 2-X'),false);
+ assert.equal(grade({type:'ox',answer:'1-O, 2-X, 3-O'},'1-O, 2-O, 3-O'),false);
  assert.equal(grade({type:'choice',answer:'②'},'①'),false);
  assert.equal(grade({type:'choice',answer:'②'},''),false);
  assert.equal(grade({type:'short',answer:'검상기'},'검상기'),null);
