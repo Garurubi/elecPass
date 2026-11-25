@@ -119,5 +119,7 @@ test('basic difficulty PDFs are isolated as ten complete rounds',()=>{
  const matching=basicQuestions.filter(q=>q.type==='matching');assert.equal(matching.length,17);
  assert.ok(matching.every(q=>q.leftItems.length===3&&q.rightItems.length===3&&Object.keys(q.answerMap).length===3));
  assert.ok(basicQuestions.every(q=>!/[ⅠⅡⅢⅣ]\.\s*(객관식|빈칸|계산형)|빠른 정답표|/.test([q.prompt,q.answer,q.explanation,q.reference].filter(Boolean).join(' '))));
- assert.deepEqual(basicQuestions.filter(q=>q.bookId==='basic-01').slice(4,9).map(q=>q.answer),['①','①','④','④','①']);
+ assert.deepEqual(basicQuestions.filter(q=>q.bookId==='basic-01').slice(4,9).map(q=>q.answer),['①','①','④','③','①']);
+ const corrected=basicQuestions.find(q=>q.id==='basic-01-q08');
+ assert.match(corrected.prompt,/틀린 것은/);assert.equal(corrected.answer,'③');assert.equal(grade(corrected,'③'),true);
 });

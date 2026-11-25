@@ -18,6 +18,14 @@ BASIC_DIR = ROOT / 'data' / 'data_261125'
 MATCHING_OVERRIDES = json.loads((ROOT / 'scripts' / 'basic-matching.json').read_text(encoding='utf-8'))
 LEFT_LABELS = ['①', '②', '③']
 RIGHT_LABELS = ['㉠', '㉡', '㉢']
+BASIC_CORRECTIONS = {
+    'basic-01-q08': {
+        'prompt': "건설기술진흥법 시행령에 따른 '중대건설사고'의 기준으로 틀린 것은?",
+        'answer': '③',
+        'answerNote': '사용자 확인으로 문제를 틀린 항목을 고르는 형식으로 수정하고 정답 ③을 반영했습니다.',
+        'explanation': '③은 중대건설사고의 기준에 관한 틀린 설명이다.'
+    }
+}
 
 
 def clean(s):
@@ -152,6 +160,8 @@ def parse_basic_pdf(file, set_id, round_number):
             'answerPage': page_number,
             'explanationNote': None if explanation else '원문에 별도 해설이 없으며 정답과 근거만 수록되어 있습니다.'
         }
+        if question['id'] in BASIC_CORRECTIONS:
+            question.update(BASIC_CORRECTIONS[question['id']])
         matching = MATCHING_OVERRIDES.get(question['id'])
         if matching:
             question.update({
