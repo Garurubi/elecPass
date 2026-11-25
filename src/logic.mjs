@@ -1,4 +1,14 @@
 export function grade(question, response) {
+  if (question.type === 'matching') {
+    try {
+      const selected = JSON.parse(response || '{}');
+      const expected = question.answerMap || {};
+      const keys = Object.keys(expected);
+      return keys.length > 0 && keys.every(key => selected[key] === expected[key]);
+    } catch {
+      return false;
+    }
+  }
   if (!question.answer || question.type === 'short') return null;
   const answer = question.answer.trim().replaceAll('Ο', 'O');
   const selected = response.trim().replaceAll('Ο', 'O');

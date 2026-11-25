@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {grade,accuracy,shuffle} from '../src/logic.mjs';
-const {questions,books}=JSON.parse(readFileSync(new URL('../src/questions.json',import.meta.url),'utf8'));
+const {questions,books,basicSets}=JSON.parse(readFileSync(new URL('../src/questions.json',import.meta.url),'utf8'));
+const bookQuestions=questions.filter(q=>books.some(b=>b.id===q.bookId));
+const basicQuestions=questions.filter(q=>basicSets.some(b=>b.id===q.bookId));
 test('PDF corpus has unique, complete question sequences and intact choices',()=>{
- assert.equal(questions.length,330);assert.equal(new Set(questions.map(q=>q.id)).size,330);
+ assert.equal(questions.length,730);assert.equal(new Set(questions.map(q=>q.id)).size,730);
  for(const b of books)assert.deepEqual(questions.filter(q=>q.bookId===b.id).map(q=>q.number),Array.from({length:30},(_,i)=>i+1));
  for(const q of questions){assert.ok(q.prompt.length>10);assert.ok(q.page>0);assert.ok(!q.prompt.includes('제2부.'));if(q.type==='choice'){assert.equal(q.options.length,4);assert.ok(q.options.every(x=>x.length>0));}}
- assert.equal(questions.filter(q=>q.answer).length,330);
+ assert.equal(questions.filter(q=>q.answer).length,730);
 });
 test('answer key matches the source quick-answer table',()=>{
  const qs=questions.filter(q=>q.bookId==='book-1');
@@ -41,6 +43,8 @@ test('grading excludes missing keys and subjective responses, not unanswered obj
  assert.equal(grade({type:'choice',answer:'②'},'①'),false);
  assert.equal(grade({type:'choice',answer:'②'},''),false);
  assert.equal(grade({type:'short',answer:'검상기'},'검상기'),null);
+ assert.equal(grade({type:'matching',answerMap:{1:'c',2:'a',3:'b'}},JSON.stringify({1:'c',2:'a',3:'b'})),true);
+ assert.equal(grade({type:'matching',answerMap:{1:'c',2:'a',3:'b'}},JSON.stringify({1:'a',2:'c',3:'b'})),false);
  assert.equal(grade({type:'ox',answer:null},'O'),null);
  assert.equal(accuracy([{correct:true},{correct:false},{correct:null}]),50);
  assert.equal(accuracy([{correct:null}]),null);
@@ -52,7 +56,7 @@ test('random practice retains unique question identities without modifying sourc
 
 test('new books preserve types, handle conflicting keys, and include scanned answers',()=>{
  assert.equal(books.length,11);
- assert.equal(questions.filter(q=>q.explanation).length,305);
+ assert.equal(bookQuestions.filter(q=>q.explanation).length,305);
  for(const book of books){const qs=questions.filter(q=>q.bookId===book.id);assert.equal(qs.filter(q=>q.type==='choice').length,20);assert.equal(qs.filter(q=>q.type==='short').length,5);assert.equal(qs.filter(q=>q.type==='ox').length,5);}
  const conflict=questions.find(q=>q.id==='book-2-q14');
  assert.equal(conflict.answer,'③');assert.match(conflict.answerNote,/사용자 확인으로 정답 ③/);assert.equal(grade(conflict,'③'),true);
@@ -94,7 +98,26 @@ test('third motor wiring practice set is fully imported',()=>{
 });
 
 test('short-answer focused practice has a complete pool',()=>{
- const short=questions.filter(q=>q.type==='short');
+ const short=bookQuestions.filter(q=>q.type==='short');
  assert.equal(short.length,55);assert.ok(short.every(q=>q.answer));
  assert.ok(books.every(b=>short.filter(q=>q.bookId===b.id).length===5));
+});
+
+test('basic difficulty PDFs are isolated as ten complete rounds',()=>{
+ assert.equal(basicSets.length,10);assert.equal(basicQuestions.length,400);
+ for(const [index,set] of basicSets.entries()){
+  assert.equal(set.id,`basic-${String(index+1).padStart(2,'0')}`);
+  const qs=basicQuestions.filter(q=>q.bookId===set.id);
+  assert.deepEqual(qs.map(q=>q.number),Array.from({length:40},(_,i)=>i+1));
+  assert.equal(qs.filter(q=>q.type==='choice').length,26);
+  assert.equal(qs.filter(q=>q.type==='short'||q.type==='matching').length,14);
+  assert.ok(qs.every(q=>q.answer&&q.sourceFile===set.file&&q.answerSourceFile===set.file));
+  assert.ok(qs.filter(q=>q.type==='choice').every(q=>/^[①②③④]$/.test(q.answer)));
+ }
+ assert.ok(basicSets.every(set=>!books.some(book=>book.id===set.id||book.file===set.file)));
+ assert.equal(basicQuestions.filter(q=>q.explanation).length,373);
+ const matching=basicQuestions.filter(q=>q.type==='matching');assert.equal(matching.length,17);
+ assert.ok(matching.every(q=>q.leftItems.length===3&&q.rightItems.length===3&&Object.keys(q.answerMap).length===3));
+ assert.ok(basicQuestions.every(q=>!/[ⅠⅡⅢⅣ]\.\s*(객관식|빈칸|계산형)|빠른 정답표|/.test([q.prompt,q.answer,q.explanation,q.reference].filter(Boolean).join(' '))));
+ assert.deepEqual(basicQuestions.filter(q=>q.bookId==='basic-01').slice(4,9).map(q=>q.answer),['①','①','④','④','①']);
 });

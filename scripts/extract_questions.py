@@ -14,6 +14,10 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'src' / 'questions.json'
+BASIC_DIR = ROOT / 'data' / 'data_261125'
+MATCHING_OVERRIDES = json.loads((ROOT / 'scripts' / 'basic-matching.json').read_text(encoding='utf-8'))
+LEFT_LABELS = ['①', '②', '③']
+RIGHT_LABELS = ['㉠', '㉡', '㉢']
 
 
 def clean(s):
@@ -56,6 +60,118 @@ def answer_details(full):
     return [(m, int(m[1]), clean(m[2]), None) for m in plain]
 
 
+def split_layout_columns(text):
+    """Split the fixed two-column basic-level PDFs into reading-order columns."""
+    left, right = [], []
+    for line in text.splitlines():
+        runs = [m for m in re.finditer(r' {3,}', line)
+                if m.start() <= 55 and m.end() >= 40]
+        if runs:
+            # The right column begins at layout character 48-51. Internal
+            # alignment spaces may occur later in either column, so the end
+            # of the gutter is a more reliable signal than its midpoint.
+            gap = min(runs, key=lambda m: abs(m.end() - 50))
+            left.append(line[:gap.start()].rstrip())
+            right.append(line[gap.end():].rstrip())
+        else:
+            left.append(line.rstrip())
+            right.append('')
+    return '\n'.join(left), '\n'.join(right)
+
+
+def parse_basic_pdf(file, set_id, round_number):
+    pages = []
+    for page in PdfReader(str(file)).pages:
+        layout = page.extract_text(extraction_mode='layout') or ''
+        pages.append(split_layout_columns(layout))
+
+    blocks = []
+    expected_number = 1
+    for page_number, columns in enumerate(pages, 1):
+        for column in columns:
+            column = re.sub(r'(?m)^\s*[◆◇]?\s*\d+\s*/\s*6\s*[◆◇]?\s*$', '', column)
+            candidates = list(re.finditer(r'(?m)^(\d{1,2})\.\s*', column))
+            matches = []
+            for candidate in candidates:
+                if int(candidate[1]) == expected_number:
+                    matches.append(candidate)
+                    expected_number += 1
+            for i, match in enumerate(matches):
+                number = int(match[1])
+                end = matches[i + 1].start() if i + 1 < len(matches) else len(column)
+                blocks.append((number, page_number, column[match.end():end]))
+
+    # A nested numbered list is indented in the source and therefore is not a
+    # top-level match. Requiring the complete sequence also guards the column
+    # splitter against silently importing malformed text.
+    numbers = [number for number, _, _ in blocks]
+    if sorted(numbers) != list(range(1, 41)):
+        raise ValueError(f'Basic PDF question sequence is incomplete: {file.name}: {numbers}')
+
+    result = []
+    for number, page_number, raw in sorted(blocks):
+        raw = re.sub(r'(?m)^\s*(?:Ⅰ|Ⅱ|Ⅲ|Ⅳ)\.\s*[^\n]+$', '', raw)
+        answer_match = re.search(r'(?m)^\s*정답\s*:\s*', raw)
+        if not answer_match:
+            raise ValueError(f'Answer not found: {file.name} question {number}')
+        prompt_raw = raw[:answer_match.start()]
+        answer_tail = raw[answer_match.end():]
+        explanation_match = re.search(r'(?m)^\s*해설\s*:\s*', answer_tail)
+        reference_match = re.search(r'(?m)^\s*근거\s*:\s*', answer_tail)
+        answer_end = min([m.start() for m in (explanation_match, reference_match) if m] or [len(answer_tail)])
+        answer = clean(answer_tail[:answer_end])
+
+        explanation = None
+        if explanation_match:
+            explanation_end = reference_match.start() if reference_match and reference_match.start() > explanation_match.end() else len(answer_tail)
+            explanation = clean(answer_tail[explanation_match.end():explanation_end]) or None
+        reference = clean(answer_tail[reference_match.end():]) if reference_match else None
+
+        prompt = clean(prompt_raw)
+        question_type = 'choice' if 5 <= number <= 30 else 'short'
+        parts = re.split(r'[①②③④]', prompt) if question_type == 'choice' else [prompt]
+        options = [clean(option) for option in parts[1:] if clean(option)]
+        if question_type == 'choice' and len(options) != 4:
+            raise ValueError(f'Expected four choices: {file.name} question {number}: {options}')
+
+        question = {
+            'id': f'{set_id}-q{number:02}',
+            'bookId': set_id,
+            'number': number,
+            'type': question_type,
+            'topic': f'기본난이도 · {round_number}회차',
+            'prompt': clean(parts[0]),
+            'options': options,
+            'answer': normalize_answer(answer),
+            'answerNote': None,
+            'explanation': explanation,
+            'reference': reference,
+            'sourceFile': file.name,
+            'page': page_number,
+            'answerSourceFile': file.name,
+            'answerPage': page_number,
+            'explanationNote': None if explanation else '원문에 별도 해설이 없으며 정답과 근거만 수록되어 있습니다.'
+        }
+        matching = MATCHING_OVERRIDES.get(question['id'])
+        if matching:
+            question.update({
+                'type': 'matching',
+                'prompt': matching['prompt'],
+                'options': [],
+                'leftItems': [
+                    {'id': str(i + 1), 'label': LEFT_LABELS[i], 'text': text}
+                    for i, text in enumerate(matching['leftItems'])
+                ],
+                'rightItems': [
+                    {'id': chr(ord('a') + i), 'label': RIGHT_LABELS[i], 'text': text}
+                    for i, text in enumerate(matching['rightItems'])
+                ],
+                'answerMap': matching['answerMap']
+            })
+        result.append(question)
+    return result
+
+
 old = json.loads(OUTPUT.read_text(encoding='utf-8')) if OUTPUT.exists() else {'books': [], 'questions': []}
 old_ids = {canonical_name(b['file']): b['id'] for b in old.get('books', [])}
 legacy_ids = {
@@ -65,7 +181,7 @@ legacy_ids = {
     '(과평)접지피뢰설비공사+수변전설비공사+개폐장치 유지보수공사 예상문제3.pdf': 'book-4',
 }
 
-source_files = sorted((ROOT / 'data').rglob('*.pdf'))
+source_files = sorted(file for file in (ROOT / 'data').rglob('*.pdf') if BASIC_DIR not in file.parents)
 selected = {}
 for file in source_files:
     key = canonical_name(file.name)
@@ -192,5 +308,22 @@ for file in sorted(selected.values(), key=lambda p: str(p)):
             q['options'] = [clean(opt) for opt in q['options'] if opt.strip()]
         questions.append(q)
 
-OUTPUT.write_text(json.dumps({'books': books, 'questions': questions}, ensure_ascii=False, indent=2), encoding='utf-8')
-print(f'Extracted {len(questions)} questions; {len(books)} books')
+basic_sets = []
+if BASIC_DIR.exists():
+    basic_files = sorted(BASIC_DIR.glob('*회차_문제및정답.pdf'), key=lambda p: int(re.match(r'(\d+)회차', p.name)[1]))
+    for file in basic_files:
+        round_number = int(re.match(r'(\d+)회차', file.name)[1])
+        set_id = f'basic-{round_number:02}'
+        imported = parse_basic_pdf(file, set_id, round_number)
+        questions.extend(imported)
+        basic_sets.append({
+            'id': set_id,
+            'title': f'기본난이도 예상문제 {round_number}회차',
+            'file': file.name,
+            'count': len(imported),
+            'hasAnswers': True,
+            'note': f'정답 {len(imported)}문항 · 해설 {sum(bool(q["explanation"]) for q in imported)}문항'
+        })
+
+OUTPUT.write_text(json.dumps({'books': books, 'basicSets': basic_sets, 'questions': questions}, ensure_ascii=False, indent=2), encoding='utf-8')
+print(f'Extracted {len(questions)} questions; {len(books)} books; {len(basic_sets)} basic sets')
